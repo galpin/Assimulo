@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        sundials_version: [2.7.0, 3.2.0]
+        sundials_version: [2.7.0-1, 2.7.0, 3.2.0]
     steps:
     - uses: actions/checkout@v3
     - name: Install system
@@ -28,7 +28,7 @@ jobs:
         sudo cp -v ./SRC/*.h /usr/include
     - name: Install sundials
       run: |
-        git clone --depth 1 -b v${{ matrix.sundials_version }} https://github.com/LLNL/sundials /tmp/sundials
+        git clone --depth 1 -b v${{ matrix.sundials_version }} https://github.com/modelon-community/sundials /tmp/sundials
         cd /tmp/sundials
         if test "${{ matrix.sundials_version }}" = "2.7.0"; then echo "target_link_libraries(sundials_idas_shared lapack blas superlu_mt_OPENMP)" >> src/idas/CMakeLists.txt; echo "target_link_libraries(sundials_kinsol_shared lapack blas superlu_mt_OPENMP)" >> src/kinsol/CMakeLists.txt; fi
         mkdir build && cd build
