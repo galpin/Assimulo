@@ -19,7 +19,7 @@ jobs:
         python-version: '3.12.x'
     - name: Setup Python
       run: |
-        python3 -m pip install Cython numpy scipy matplotlib nose-py3 setuptools==69.1.0 wheel
+        python3 -m pip install Cython numpy scipy matplotlib nose-py3 setuptools==69.1.0 wheel auditwheel
     - name: Install system
       run: |
         sudo apt-get -y install cmake liblapack-dev libsuitesparse-dev libhypre-dev
@@ -44,13 +44,14 @@ jobs:
     - name: Build
       run: |
         python3 setup.py bdist_wheel --sundials-home=/usr --blas-home=/usr/lib/x86_64-linux-gnu/ --lapack-home=/usr/lib/x86_64-linux-gnu/ --superlu-home=/usr
-        ls
-        ls build/
+    - name: Auditwheel
+      run: |
+        auditwheel repair build/dist/*.whl --plat manylinux_2_35_x86_64 -w dist/
     - name: Upload build artifacts
       uses: actions/upload-artifact@v3
       with:
         name: build-artifacts
-        path: build/**/*.whl
+        path: dist/*.whl
     # Tests are currently failing on Python 3.12 due to the following:
     # https://github.com/modelon-community/Assimulo/issues/106
     # - name: Test
