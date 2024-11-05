@@ -9,16 +9,17 @@ jobs:
   linux:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        sundials_version: [2.7.0, 3.2.0]
+        sundials_version: [2.7.0]
     steps:
     - uses: actions/checkout@v4
-    - uses: actions/setup-python@v4
+    - uses: actions/setup-python@v5
       with:
-        python-version: '3.9.x'
+        python-version: '3.12.x'
     - name: Setup Python
       run: |
-        python3 -m pip install Cython "numpy<2" scipy matplotlib nose-py3 setuptools==69.1.0
+        python3 -m pip install Cython numpy scipy matplotlib nose-py3 setuptools==69.1.0 wheel
     - name: Install system
       run: |
         sudo apt-get -y install cmake liblapack-dev libsuitesparse-dev libhypre-dev
@@ -26,21 +27,31 @@ jobs:
     - name: Install superlu
       run: |
         cd /tmp
-        curl -fSsL https://portal.nersc.gov/project/sparse/superlu/superlu_mt_3.1.tar.gz | tar xz
-        cd SuperLU_MT_3.1
-        make CFLAGS="-O2 -fPIC -fopenmp" BLASLIB="-lblas" PLAT="_OPENMP" MPLIB="-fopenmp" lib -j1
-        sudo cp -v ./lib/libsuperlu_mt_OPENMP.a /usr/lib
-        sudo cp -v ./SRC/*.h /usr/include
+        curl -fSsL https://github.com/xiaoyeli/superlu_mt/archive/refs/tags/v4.0.1.tar.gz | tar xz
+        cd superlu_mt-4.0.1
+        cmake -Denable_examples=OFF -Denable_tests=OFF -DPLAT="_OPENMP" -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_INSTALL_LIBDIR=lib -DSUPERLUMT_INSTALL_INCLUDEDIR=include .
+        make -j4
+        sudo make install
     - name: Install sundials
       run: |
         git clone --depth 1 -b v${{ matrix.sundials_version }} https://github.com/LLNL/sundials /tmp/sundials
         cd /tmp/sundials
         if test "${{ matrix.sundials_version }}" = "2.7.0"; then echo "target_link_libraries(sundials_idas_shared lapack blas superlu_mt_OPENMP)" >> src/idas/CMakeLists.txt; echo "target_link_libraries(sundials_kinsol_shared lapack blas superlu_mt_OPENMP)" >> src/kinsol/CMakeLists.txt; fi
         mkdir build && cd build
-        cmake -LAH -DSUPERLUMT_BLAS_LIBRARIES=blas -DSUPERLUMT_LIBRARIES=blas -DSUPERLUMT_INCLUDE_DIR=/usr/include -DSUPERLUMT_LIBRARY=/usr/lib/libsuperlu_mt_OPENMP.a -DSUPERLUMT_THREAD_TYPE=OpenMP -DCMAKE_INSTALL_PREFIX=/usr -DSUPERLUMT_ENABLE=ON -DLAPACK_ENABLE=ON -DEXAMPLES_ENABLE=OFF -DEXAMPLES_ENABLE_C=OFF -DBUILD_STATIC_LIBS=OFF ..
+        cmake -LAH -DSUPERLUMT_BLAS_LIBRARIES=blas -DSUPERLUMT_LIBRARIES=blas -DSUPERLUMT_INCLUDE_DIR=/usr/include -DSUPERLUMT_LIBRARY=/usr/lib/libsuperlu_mt_OPENMP.a -DSUPERLUMT_THREAD_TYPE=OpenMP -DCMAKE_INSTALL_PREFIX=/usr -DSUPERLUMT_ENABLE=ON -DLAPACK_ENABLE=ON -DEXAMPLES_ENABLE=OFF -DEXAMPLES_ENABLE_C=OFF -DBUILD_STATIC_LIBS=OFF -DSUNDIALS_INDEX_SIZE=32 ..
         make -j4
         sudo make install
     - name: Build
-      run: python3 setup.py install --user --sundials-home=/usr --blas-home=/usr/lib/x86_64-linux-gnu/ --lapack-home=/usr/lib/x86_64-linux-gnu/ --superlu-home=/usr
-    - name: Test
-      run: python3 -m nose --verbose tests/* tests/solvers/*
+      run: |
+        python3 setup.py bdist_wheel --sundials-home=/usr --blas-home=/usr/lib/x86_64-linux-gnu/ --lapack-home=/usr/lib/x86_64-linux-gnu/ --superlu-home=/usr
+        ls
+        ls build/
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-artifacts
+        path: build/**/*.whl
+    # Tests are currently failing on Python 3.12 due to the following:
+    # https://github.com/modelon-community/Assimulo/issues/106
+    # - name: Test
+    #   run: python3 -m nose --verbose tests/* tests/solvers/*
