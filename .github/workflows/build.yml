@@ -46,7 +46,7 @@ jobs:
         python3 setup.py bdist_wheel --sundials-home=/usr --blas-home=/usr/lib/x86_64-linux-gnu/ --lapack-home=/usr/lib/x86_64-linux-gnu/ --superlu-home=/usr
     - name: Auditwheel
       run: |
-        auditwheel repair build/dist/*.whl --plat manylinux_2_35_x86_64 -w dist/
+        auditwheel repair build/dist/*.whl --plat manylinux_2_35_x86_64 -w dist/ --only-plat
     - name: Upload build artifacts
       uses: actions/upload-artifact@v3
       with:
